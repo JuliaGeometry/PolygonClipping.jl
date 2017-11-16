@@ -132,12 +132,12 @@ poly1 = Polygon()
 vert1 = Vertex(0,1)
 push!(poly1, vert1)
 @test length(poly1) == 1
-@test is(poly1.start, vert1)
+@test poly1.start === vert1
 remove(vert1, poly1)
 @test length(poly1) == 0
-@test is(poly1.start, nothing)
-@test is(vert1.next, nothing)
-@test is(vert1.prev, nothing)
+@test poly1.start === nothing
+@test vert1.next === nothing
+@test vert1.prev === nothing
 push!(poly1, vert1)
 vert2 = Vertex(1,1)
 push!(poly1, vert2)
@@ -146,7 +146,7 @@ push!(poly1, Vertex(0,0))
 @test length(poly1) == 4
 remove(vert1, poly1)
 @test length(poly1) == 3
-@test is(poly1.start, vert2)
+@test poly1.start === vert2
 
 # test clipping
 println("Testing clipping...")
@@ -171,8 +171,8 @@ pc.phase1!(poly3, poly1)
 intersects = 0
 for p1 in poly1, p2 in poly3
     if p1.location == p2.location
-        @test is(p1.neighbor, p2)
-        @test is(p2.neighbor, p1)
+        @test p1.neighbor === p2
+        @test p2.neighbor === p1
         @test p1.intersect
         @test p2.intersect
         intersects += 1
@@ -308,8 +308,8 @@ PolygonClipping.phase1!(polya, polyb)
 intersects = 0
 for p1 in polya, p2 in polyb
     if p1.location == p2.location
-        @test is(p1.neighbor, p2)
-        @test is(p2.neighbor, p1)
+        @test p1.neighbor === p2
+        @test p2.neighbor === p1
         @test p1.intersect
         @test p2.intersect
         intersects += 1
@@ -334,8 +334,8 @@ PolygonClipping.phase1!(polyb, polya)
 intersects = 0
 for p1 in polya, p2 in polyb
     if p1.location == p2.location
-        @test is(p1.neighbor, p2)
-        @test is(p2.neighbor, p1)
+        @test p1.neighbor === p2
+        @test p2.neighbor === p1
         @test p1.intersect
         @test p2.intersect
         intersects += 1
