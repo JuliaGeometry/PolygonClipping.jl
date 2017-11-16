@@ -3,19 +3,19 @@ module PolygonClipping
 import Base.show
 import Base.push!
 import Base.length
-using ImmutableArrays
+import StaticArrays.ImmutableArrays.Vector2
 
 export Vertex, Polygon, push!, intersection, isinside, show, unprocessed,
        VertexException, EdgeException, DegeneracyException, length, remove, infill
 
 type Vertex
     location::Vector2{Float64}
-    next::Union(Vertex, Nothing)
-    prev::Union(Vertex, Nothing)
-    nextpoly::Union(Vertex, Nothing)
+    next::Union{Vertex, Void}
+    prev::Union{Vertex, Void}
+    nextpoly::Union{Vertex, Void}
     intersect::Bool
     entry::Bool
-    neighbor::Union(Vertex, Nothing)
+    neighbor::Union{Vertex, Void}
     visited::Bool
     alpha::Float64
 
@@ -43,21 +43,21 @@ function show(io::IO, vert::Vertex)
 end
 
 type Polygon
-    start::Union(Vertex, Nothing)
+    start::Union{Vertex, Void}
 
     Polygon() = new(nothing)
 end
 
 Base.start(m::Polygon) = (m.start, false)
-function Base.next(m::Polygon, state::(Vertex, Bool))
-    if is(m.start, state[1])
+function Base.next(m::Polygon, state::Tuple{Vertex, Bool})
+    if m.start === state[1]
         return (state[1], (state[1].next, true))
     else
         return (state[1], (state[1].next, state[2]))
     end
 end
-Base.done(m::Polygon, state::(Vertex, Bool)) = (is(m.start, state[1]) && state[2])
-Base.done(m::Polygon, state::(Nothing, Bool)) = true
+Base.done(m::Polygon, state::Tuple{Vertex, Bool}) = (m.start === state[1] && state[2])
+Base.done(m::Polygon, state::Tuple{Void, Bool}) = true
 
 function length(p::Polygon)
     n = 0
@@ -119,8 +119,8 @@ function unprocessed(p::Polygon)
 end
 
 function remove(v::Vertex, poly::Polygon)
-    if is(v, poly.start)
-        if is(v.next, v)
+    if v === poly.start
+        if v.next === v
             poly.start = nothing
             v.next = nothing
             v.prev = nothing
@@ -192,10 +192,10 @@ function phase1!(subject::Polygon, clip::Polygon)
                 # Find where to insert vertices
                 av = sv
                 bv = cv
-                while av.alpha <= a && !is(av, svn)
+                while av.alpha <= a && !(av === svn)
                     av = av.next
                 end
-                while bv.alpha <= b && !is(bv, cvn)
+                while bv.alpha <= b && !(bv === cvn)
                     bv = bv.next
                 end
 
@@ -209,12 +209,12 @@ function phase1!(subject::Polygon, clip::Polygon)
                 i1.neighbor = i2
                 i2.neighbor = i1
             end
-            if is(cvn, clip.start)
+            if cvn === clip.start
                 break
             end
             cv = cvn
         end
-        if is(svn, subject.start)
+        if svn === subject.start
             break
         end
         sv = svn
