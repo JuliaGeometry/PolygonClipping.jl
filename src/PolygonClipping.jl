@@ -10,12 +10,12 @@ export Vertex, Polygon, push!, intersection, isinside, show, unprocessed,
 
 type Vertex
     location::Vector2{Float64}
-    next::Union(Vertex, Nothing)
-    prev::Union(Vertex, Nothing)
-    nextpoly::Union(Vertex, Nothing)
+    next::Union{Vertex, Void}
+    prev::Union{Vertex, Void}
+    nextpoly::Union{Vertex, Void}
     intersect::Bool
     entry::Bool
-    neighbor::Union(Vertex, Nothing)
+    neighbor::Union{Vertex, Void}
     visited::Bool
     alpha::Float64
 
@@ -43,21 +43,21 @@ function show(io::IO, vert::Vertex)
 end
 
 type Polygon
-    start::Union(Vertex, Nothing)
+    start::Union{Vertex, Void}
 
     Polygon() = new(nothing)
 end
 
 Base.start(m::Polygon) = (m.start, false)
-function Base.next(m::Polygon, state::(Vertex, Bool))
+function Base.next(m::Polygon, state::Tuple{Vertex, Bool})
     if is(m.start, state[1])
         return (state[1], (state[1].next, true))
     else
         return (state[1], (state[1].next, state[2]))
     end
 end
-Base.done(m::Polygon, state::(Vertex, Bool)) = (is(m.start, state[1]) && state[2])
-Base.done(m::Polygon, state::(Nothing, Bool)) = true
+Base.done(m::Polygon, state::Tuple{Vertex, Bool}) = (is(m.start, state[1]) && state[2])
+Base.done(m::Polygon, state::Tuple{Void, Bool}) = true
 
 function length(p::Polygon)
     n = 0
