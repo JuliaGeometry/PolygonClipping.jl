@@ -3,7 +3,7 @@ module PolygonClipping
 import Base.show
 import Base.push!
 import Base.length
-using ImmutableArrays
+import StaticArrays.ImmutableArrays.Vector2
 
 export Vertex, Polygon, push!, intersection, isinside, show, unprocessed,
        VertexException, EdgeException, DegeneracyException, length, remove, infill
