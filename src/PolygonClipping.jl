@@ -3,61 +3,46 @@ module PolygonClipping
 import Base.show
 import Base.push!
 import Base.length
-using ImmutableArrays
+using StaticArrays
 
 export Vertex, Polygon, push!, intersection, isinside, show, unprocessed,
        VertexException, EdgeException, DegeneracyException, length, remove, infill
 
-type Vertex
-    location::Vector2{Float64}
-    next::Union(Vertex, Nothing)
-    prev::Union(Vertex, Nothing)
-    nextpoly::Union(Vertex, Nothing)
+mutable struct Vertex
+    location::SVector{2,Float64}
+    next::Union{Vertex, Nothing}
+    prev::Union{Vertex, Nothing}
+    nextpoly::Union{Vertex, Nothing}
     intersect::Bool
     entry::Bool
-    neighbor::Union(Vertex, Nothing)
+    neighbor::Union{Vertex, Nothing}
     visited::Bool
     alpha::Float64
 
-    Vertex(x) = new(Vector2(x), nothing, nothing, nothing, false, true, nothing, false, 0.0)
-    Vertex(x::Float64,y::Float64) = new(Vector2(x,y), nothing, nothing, nothing, false, true, nothing, false, 0.0)
-    Vertex(x::Real,y::Real) = new(Vector2(convert(Float64,x),convert(Float64,y)), nothing, nothing, nothing, false, true, nothing, false, 0.0)
-    Vertex(x::Vector2, a::Vertex, b::Vertex) = new(x, a, b, nothing, false, true, nothing, false, 0.0)
 end
 
-type VertexException <: Exception end
-type EdgeException <: Exception end
-type DegeneracyException <: Exception end
+Vertex(x) = Vertex(x, nothing, nothing, nothing, false, true, nothing, false, 0.0)
+Vertex(x::Real,y::Real) = Vertex(SVector(x,y), nothing, nothing, nothing, false, true, nothing, false, 0.0)
+Vertex(x::AbstractVector, a::Vertex, b::Vertex) = Vertex(x, a, b, nothing, false, true, nothing, false, 0.0)
 
-function show(io::IO, vert::Vertex)
-    println("Vertex:")
-    println("\tMem:", pointer_from_objref(vert))
-    println("\tLocation:",vert.location)
-    println("\tNext:",pointer_from_objref(vert.next))
-    println("\tPrev:",pointer_from_objref(vert.prev))
-    println("\tNextPoly:",pointer_from_objref(vert.nextpoly))
-    println("\tNeighbor:",pointer_from_objref(vert.neighbor))
-    println("\tIntersect:",vert.intersect)
-    println("\tEntry:",vert.entry)
-    println("\tVisited:",vert.visited)
-end
+struct VertexException <: Exception end
+struct EdgeException <: Exception end
+struct DegeneracyException <: Exception end
 
-type Polygon
-    start::Union(Vertex, Nothing)
+mutable struct Polygon
+    start::Union{Vertex, Nothing}
 
     Polygon() = new(nothing)
 end
 
-Base.start(m::Polygon) = (m.start, false)
-function Base.next(m::Polygon, state::(Vertex, Bool))
-    if is(m.start, state[1])
-        return (state[1], (state[1].next, true))
+Base.iterate(m::Polygon) = m.start === nothing ? nothing : (m.start, m.start) # (initial, first?)
+function Base.iterate(m::Polygon, state)
+    if m.start === state.next
+        return nothing
     else
-        return (state[1], (state[1].next, state[2]))
+        return (state.next, state.next)
     end
 end
-Base.done(m::Polygon, state::(Vertex, Bool)) = (is(m.start, state[1]) && state[2])
-Base.done(m::Polygon, state::(Nothing, Bool)) = true
 
 function length(p::Polygon)
     n = 0
@@ -65,17 +50,6 @@ function length(p::Polygon)
         n += 1
     end
     n
-end
-
-
-function show(io::IO, p::Polygon)
-    println("A Wild Porygon Appeared:")
-    i = 1
-    for vert in p
-        print(i, " ")
-        show(io, vert)
-        i = i + 1
-    end
 end
 
 function push!(p::Polygon, v::Vertex)
@@ -101,7 +75,7 @@ function Vertex(s::Vertex, c::Vertex, alpha::Float64)
     return a
 end
 
-function Vertex(s::Vertex, c::Vertex, location::Vector2{Float64})
+function Vertex(s::Vertex, c::Vertex, location::SVector{2,Float64})
     # Insert a vertex between s and c at location
     a = Vertex(location, c, s)
     s.next = a
@@ -119,8 +93,8 @@ function unprocessed(p::Polygon)
 end
 
 function remove(v::Vertex, poly::Polygon)
-    if is(v, poly.start)
-        if is(v.next, v)
+    if v === poly.start
+        if v.next === v
             poly.start = nothing
             v.next = nothing
             v.prev = nothing
@@ -136,13 +110,16 @@ function remove(v::Vertex, poly::Polygon)
     return
 end
 
+function detq(q1,q2,r)
+    (q1[1]-r[1])*(q2[2]-r[2])-(q2[1]-r[1])*(q1[2]-r[2])
+end
+
 function isinside(v::Vertex, poly::Polygon)
     # See: http://www.sciencedirect.com/science/article/pii/S0925772101000128
     # "The point in polygon problem for arbitrary polygons"
     # An implementation of Hormann-Agathos (2001) Point in Polygon algorithm
     c = false
     r = v.location
-    detq(q1,q2) = (q1[1]-r[1])*(q2[2]-r[2])-(q2[1]-r[1])*(q1[2]-r[2])
     for q1 in poly
         q2 = q1.next
         if q1.location == r
@@ -159,17 +136,22 @@ function isinside(v::Vertex, poly::Polygon)
             if q1.location[1] >= r[1]
                 if q2.location[1] > r[1]
                     c = !c
-                elseif ((detq(q1.location,q2.location) > 0) == (q2.location[2] > q1.location[2])) # right crossing
+                elseif ((detq(q1.location,q2.location,r) > 0) == (q2.location[2] > q1.location[2])) # right crossing
                     c = !c
                 end
             elseif q2.location[1] > r[1]
-                if ((detq(q1.location,q2.location) > 0) == (q2.location[2] > q1.location[2])) # right crossing
+                if ((detq(q1.location,q2.location,r) > 0) == (q2.location[2] > q1.location[2])) # right crossing
                     c = !c
                 end
             end
         end
     end
     return c
+end
+
+function phase1!(p1,p2,p3)
+    phase1!(p1,p2)
+    phase1!(p1,p3)
 end
 
 function phase1!(subject::Polygon, clip::Polygon)
@@ -192,10 +174,10 @@ function phase1!(subject::Polygon, clip::Polygon)
                 # Find where to insert vertices
                 av = sv
                 bv = cv
-                while av.alpha <= a && !is(av, svn)
+                while av.alpha <= a && av !== svn
                     av = av.next
                 end
-                while bv.alpha <= b && !is(bv, cvn)
+                while bv.alpha <= b && bv !== cvn
                     bv = bv.next
                 end
 
@@ -209,12 +191,12 @@ function phase1!(subject::Polygon, clip::Polygon)
                 i1.neighbor = i2
                 i2.neighbor = i1
             end
-            if is(cvn, clip.start)
+            if cvn === clip.start
                 break
             end
             cv = cvn
         end
-        if is(svn, subject.start)
+        if svn === subject.start
             break
         end
         sv = svn
